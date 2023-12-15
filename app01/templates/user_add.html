@@ -1,0 +1,50 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    <div class="container">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">添加用户</h3>
+            </div>
+            <div class="panel-body">
+                <form action="/user/add/" method="post" novalidate>
+                    {% csrf_token %}
+                    {#                    <div class="form-group">#}
+                    {#                        <label>名称</label>#}
+                    {#                        <input type="text" class="form-control" placeholder="部门名称" name="user_name">#}
+                    {#                    </div>#}
+                    {#                    {% for field in form_obj1 %}#}
+                    {#                        {{ field }}#}
+                    {#                    {% endfor %}#}
+                    {% for field in form %}
+                        <div class="form-group">
+                            <label>{{ field.label }}: </label>
+                            {{ field }}
+                            <!-- 数据校验,显示错误信息 -->
+                            <span style="color: red;">{{ field.errors.0 }}</span>
+                        </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript">
+        $(function () {
+            //当容器加载完成，对容器调用工具函数
+            $("#myDate").datetimepicker({
+                language: 'zh-CN', //语言
+                format: 'yyyy-mm-dd',//日期的格式
+                minView: 'month', //可以选择的最小视图
+                initialDate: new Date(),//初始化显示的日期
+                autoclose: true,//设置选择完日期或者时间之后，日否自动关闭日历
+                todayBtn: true,//设置自动显示为今天
+                clearBtn: false//设置是否清空按钮，默认为false
+            });
+        });
+    </script>
+{% endblock %}
