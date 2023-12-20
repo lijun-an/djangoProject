@@ -45,7 +45,7 @@ class Pagination(object):
             prev = '<li><a href="?{}">{}</a></li>'.format(self.get_param_url(1), "<<")
             page_string_list.append(prev)
         else:
-            prev = '<li><a href="?{{}">{}</a></li>'.format(self.get_param_url(self.page - 10), "<<")
+            prev = '<li><a href="?{}">{}</a></li>'.format(self.get_param_url(self.page - 10), "<<")
             page_string_list.append(prev)
         # 处理特殊情况
         if self.page <= self.page_show:

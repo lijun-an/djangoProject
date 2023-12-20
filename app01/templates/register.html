@@ -1,0 +1,124 @@
+{% extends 'layout.html' %}
+
+
+{% block css %}
+    <style>
+        .account {
+            width: 400px;
+            border: 1px solid #dddddd;
+            border-radius: 5px;
+            box-shadow: 5px 5px 20px #aaa;
+
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 100px;
+            padding: 20px 40px;
+        }
+
+        .account h2 {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .error_msg {
+            color: red;
+            position: absolute;
+            font-size: 12px;
+
+        }
+    </style>
+{% endblock %}
+
+
+{% block content %}
+    <div class="account">
+        <h2>用户注册</h2>
+        <div class="panel-body">
+            <form method="post" action="/register/" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                    {% if field.name == 'code' %}
+                        <div class="form-group">
+                            <label>{{ field.label }}</label>
+                            <div class="row">
+                                <div class="col-xs-7">
+                                    {{ field }}
+                                    <span class="error_msg" style="color: red;">{{ field.errors.0 }}</span>
+                                </div>
+                                <div class="col-xs-5">
+                                    <input id="btnSms" type="button" class="btn btn-default" value="点击获取验证码">
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="form-group">
+                            <label>{{ field.label }}</label>
+                            {{ field }}
+                            <!-- 数据校验,显示错误信息 -->
+                            <span class="error_msg" style="color: red;">{{ field.errors.0 }}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <button type="submit" class="btn btn-primary center-block" style="width: 80px;">注册</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+{% block js %}
+    <script type="text/javascript">
+        $(function () {
+            bindBtnRegisterEvent();
+            bindBtnSmsEvent()
+
+        })
+
+        function bindBtnRegisterEvent() {
+
+
+        }
+
+
+        function bindBtnSmsEvent() {
+            $('#btnSms').click(function () {
+                    $(".error_msg").empty()
+                    var mobilePhone = $('#id_mobile_phone').val()
+                    $.ajax({
+                        url: "/send_sms/",
+                        type: "GET",
+                        data: {
+                            mobile_phone: mobilePhone,
+                            tpl: 'register'
+                        },
+                        dataType: "JSON",
+                        success: function (res) {
+                            if (res.status) {
+                                sendSmsRemind();
+                            } else {
+                                {#    错误信息展示#}
+                                $.each(res.error, function (key, value) {
+                                    $("#id_" + key).next().text(value[0])
+                                })
+                            }
+                        }
+                    });
+
+                }
+            )
+        }
+
+        function sendSmsRemind() {
+            var $smsBtn = $("#btnSms")
+            {#禁用#}
+            $smsBtn.prop('disabled', true);
+            var time = 60;
+            var remind = setInterval(function () {
+                $smsBtn.val(time + '秒重新发送');
+                time = time - 1
+                if (time < 1) {
+                    clearInterval(remind)
+                    $smsBtn.val('点击获取验证码').prop('disabled', false);
+                }
+            }, 1000)
+        }
+    </script>
+{% endblock %}

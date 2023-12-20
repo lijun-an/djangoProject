@@ -3,6 +3,7 @@
     <div class="container">
         <div style="margin-bottom: 10px">
             <a class="btn btn-success" href="/department/add/" target="_blank">新建部门</a>
+            <a class="btn btn-success" href="#" id="btnMultiAdd">批量导入</a>
         </div>
         <div>
             <div class="panel panel-default">
@@ -40,4 +41,52 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                            aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel">批量导入部门</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="panel panel-default">
+                        <!-- Default panel contents -->
+                        <div class="panel-heading">
+                                <span class="glyphicon glyphicon-th-list" aria-hidden="true"
+                                      style="margin-right: 5px;"></span>
+                            <span>文件上传</span>
+                        </div>
+                        <div class="panel-body">
+                            <form method="post" enctype="multipart/form-data" action="/department/multi/">
+                                {% csrf_token %}
+                                <div class="form-group">
+                                    <input type="file" name="exc">
+                                </div>
+                                <input type="submit" class="btn btn-sm btn-info" value="上传">
+                                <!-- 数据校验,显示错误信息 -->
+                                <span style="color: red;">{{ error }}</span>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block js %}
+    <script>
+        $(function () {
+            bindBtnMultiAddEvent();
+
+        })
+
+        function bindBtnMultiAddEvent() {
+            $("#btnMultiAdd").click(function () {
+                // 显示对话框
+                $("#myModal").modal('show');
+
+            });
+        }
+    </script>
 {% endblock %}

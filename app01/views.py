@@ -1,16 +1,22 @@
+import json
+import random
+import datetime
 from django.shortcuts import render, HttpResponse, redirect
-from app01.models import User, Department, Pretty, Admin
+from app01.models import User, Department, Pretty, Admin, Order
 from app01.utils.pagiation import Pagination
 from app01.form.form import PrettyModelForm, PrettyEditModelForm, UserModelForm, AdminModelForm, AdminEditModelForm, \
-    AdminResetModelForm, LoginForm
+    AdminResetModelForm, LoginForm, OrderModelForm, ExcelForm, RegisterFrom, SendSmsForm
+from django.views.decorators.csrf import csrf_exempt
 from app01.utils.code import check_code
 from django.shortcuts import HttpResponse
 from io import BytesIO
+import json
+from openpyxl import load_workbook
 
 
 # Create your views here.
 def index(request):
-    return redirect('/department/list')
+    return redirect('/')
 
 
 # #################################   部门管理  # #################################
@@ -28,6 +34,35 @@ def department_add(request):
     # 保存到数据库
     Department.objects.create(name=depart_name)
     return redirect("/department/list/")
+
+
+def department_multi(request):
+    # 获取上传的 Excel 文件对象
+    file_object = request.FILES.get('exc')
+    print(request.FILES)
+    form = ExcelForm(data=file_object.name, files=request.FILES)
+    print(form.errors)
+    print(form.is_valid())
+    if form.is_valid():
+        file_object = request.FILES.get('exc')
+        print(file_object)
+        if 'xlsx' not in file_object.name:
+            return HttpResponse("文件格式有误")
+        file_object = form.cleaned_data.get("exc")
+        print(file_object)
+        wb = load_workbook(file_object)
+        sheet = wb.worksheets[0]
+        # 循环获取每一行数据,并更新至数据库
+        for row in sheet.iter_rows(min_row=2):
+            exc_title = row[0].value
+            # 如果表格中的数据在数据库中不存在,则进行创建
+            if not Department.objects.filter(name=exc_title).exists():
+                Department.objects.create(name=exc_title)
+    file_object = request.FILES.get('exc')
+    if 'xlsx' not in file_object.name:
+        return HttpResponse("文件格式有误")
+    # 打开 Excel 文件读取内容
+    return redirect('/department/list/')
 
 
 def department_delete(request):
@@ -281,6 +316,31 @@ def logout(request):
     return redirect("/login/")
 
 
+def register(request):
+    """用户注册"""
+    if request.method == "GET":
+        form = RegisterFrom()
+        print(form.errors)
+        return render(request, "register.html", {"form": form})
+    form = RegisterFrom(data=request.POST)
+    if form.is_valid():
+        # 验证码的校验
+        pass
+        return redirect("/admin/list")
+    return render(request, 'register.html', {"form": form})
+
+
+def send_sms(request):
+    mobile_phone = request.GET.get('mobile_phone')
+    tpl = request.GET.get('tpl')
+    print(request.GET)
+    form = SendSmsForm(request.GET)
+    if form.is_valid():
+        return HttpResponse(json.dumps({"status": True}))
+    print(form.errors)
+    return HttpResponse(json.dumps({"status": False, "error": form.errors}))
+
+
 def image_code(request):
     """ 生成图片验证码 """
     # 调用pillow函数,生成图片
@@ -294,3 +354,120 @@ def image_code(request):
     stream = BytesIO()
     img.save(stream, 'png')
     return HttpResponse(stream.getvalue())
+
+
+def order_list(request):
+    """
+    订单管理列表
+    :return:
+    """
+    form = OrderModelForm()
+    data_dic = {}
+    search_data = request.GET.get('query', '')
+    if search_data:
+        data_dic['title__contains'] = search_data
+    queryset = Order.objects.filter(**data_dic).order_by('id')
+    page_obj = Pagination(request, queryset, 10)
+    # 分页后的数据
+    page_data = page_obj.page_data
+    # 分页html页面
+    page_html = page_obj.html()
+    context = {
+        "queryset": page_data,
+        "form": form,
+        "page_string": page_html,
+        "search_data": search_data,
+    }
+    return render(request, "order_list.html", context)
+
+
+@csrf_exempt
+def order_ajax(request):
+    """
+    ajax测试
+    :param request:
+    :return:
+    """
+    pwd = request.POST.get("pwd")
+    user = request.POST.get("user")
+    print(request.POST)
+    if user == "root" and pwd == "root":
+        data_dict = {"status": True}
+    else:
+        data_dict = {"status": False}
+    return HttpResponse(json.dumps(data_dict))
+
+
+@csrf_exempt
+def order_add(request):
+    """新建订单"""
+    form = OrderModelForm(data=request.POST)
+    print(request.POST)
+    if form.is_valid():
+        # 增加 oid 订单号
+        form.instance.oid = datetime.datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(1000, 9000))
+        # 设置当前登录用户为订单的管理员
+        admin_user = request.session["info"]["id"]
+        form.instance.admin_id = admin_user
+        form.save()
+        return HttpResponse(json.dumps({"status": True}))
+    return HttpResponse(json.dumps({"status": False, "error": form.errors}))
+
+
+def order_delete(request):
+    """ 删除订单 """
+    uid = request.GET.get('uid')
+    # 判断获取到的 id 数据行是否存在
+    if Order.objects.filter(id=uid).exists():
+        Order.objects.filter(id=uid).delete()
+        return HttpResponse(json.dumps({"status": True}))
+    else:
+        return HttpResponse(json.dumps({"status": False, "error": "删除失败, 数据不存在,请刷新页面后重试!"}))
+
+
+def order_detail(request):
+    """ 根据id获取订单详情 """
+    uid = request.GET.get('uid')
+    row_object = Order.objects.filter(id=uid).values("title", "price", "status").first()
+    print(uid, row_object)
+    if not row_object:
+        return HttpResponse(json.dumps({"status": False, "error": "数据不存在!"}))
+
+    # 从数据库中获取到一个对象 row_object
+    result = {
+        "status": True,
+        "data": row_object,
+    }
+
+    return HttpResponse(json.dumps(result))
+
+
+@csrf_exempt
+def order_edit(request):
+    """ 编辑订单 """
+    uid = request.GET.get('uid')
+    row_object = Order.objects.filter(id=uid).first()
+    print(uid, row_object)
+    if not row_object:
+        return HttpResponse(json.dumps({"status": False, "tips": "数据不存在!"}))
+
+    # 获取编辑界面提交的数据
+    data = request.POST
+    # 判断编辑的内容是否跟以前一样
+    if data["title"] != '' and data['price'] != '' and data['status'] != '':
+        flag = 0
+        if row_object.title == data["title"]:
+            flag += 1
+        if row_object.price == int(data["price"]):
+            flag += 1
+        if row_object.status == int(data["status"]):
+            flag += 1
+        # 如果输入的内容与原有内容相同,则进行提示
+        if flag == 3:
+            return HttpResponse(json.dumps({"status": False, "tips": "您没有变更任何内容,无需修改!"}))
+    form = OrderModelForm(data=request.POST, instance=row_object)
+    if form.is_valid():
+        form.save()
+        return HttpResponse(json.dumps({"status": True}))
+
+    return HttpResponse(json.dumps({"status": False, "error": form.errors}))

@@ -19,7 +19,7 @@ class User(models.Model):
     """员工表"""
     name = models.CharField(max_length=16, verbose_name="姓名")
     password = models.CharField(max_length=64, verbose_name="密码")
-    age = models.IntegerField(verbose_name="年龄")
+    age = models.IntegerField(verbose_name="年龄", default=20)
     account_balance = models.DecimalField(verbose_name="账户余额", max_digits=10, decimal_places=2, default=0)
     create_time = models.DateField(verbose_name="入职时间")
     # 外键约束
@@ -59,3 +59,21 @@ class Admin(models.Model):
     """管理员表 """
     name = models.CharField(max_length=16, verbose_name="姓名")
     password = models.CharField(max_length=64, verbose_name="密码")
+    email = models.CharField(max_length=64, verbose_name="邮箱")
+    phone = models.CharField(max_length=64, verbose_name="电话号码")
+
+
+class Order(models.Model):
+    """订单表"""
+    oid = models.CharField(verbose_name="订单号", max_length=64)
+    title = models.CharField(verbose_name="名称", max_length=32)
+    price = models.IntegerField(verbose_name="价格")
+
+    status_choices = (
+        (1, "待支付"),
+        (2, "已支付"),
+    )
+
+    status = models.SmallIntegerField(verbose_name="状态", choices=status_choices, default=1)
+    admin = models.ForeignKey(to="Admin", to_field="id", verbose_name="管理员", on_delete=models.CASCADE)
+#     depart = models.ForeignKey(to="Department", to_field="id", on_delete=models.SET_NULL, null=True, blank=True)mi

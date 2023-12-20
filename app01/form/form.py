@@ -1,8 +1,10 @@
+import random
 import re
-from app01.models import User, Pretty, Admin
+from app01.models import User, Pretty, Admin, Order
 from django import forms
 from django.core.exceptions import ValidationError
-from app01.utils.modelform import BootStrapModelForm
+from app01.utils.modelform import BootStrapModelForm, BootStrapForm
+from django.core.validators import RegexValidator
 from app01.utils.encrypt import md5
 
 
@@ -184,3 +186,90 @@ class LoginForm(forms.Form):
     def clean_password(self):
         pwd = self.cleaned_data.get("password")
         return md5(pwd)
+
+
+class RegisterFrom(BootStrapForm):
+    name = forms.CharField(
+        label="用户名",
+        widget=forms.TextInput(),
+        required=True,
+    )
+    email = forms.CharField(
+        label="邮箱",
+        widget=forms.TextInput(),
+        required=True,
+        validators=[RegexValidator(
+            r'^[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(com|cn|net)$',
+            '邮箱格式错误'), ],
+    )
+    password = forms.CharField(
+        label="密码",
+        widget=forms.PasswordInput(),
+        required=True,
+    )
+    confirm_password = forms.CharField(
+        label="确认密码",
+        widget=forms.PasswordInput(),
+        required=True,
+    )
+    mobile_phone = forms.CharField(
+        label="手机号",
+        widget=forms.TextInput(),
+        required=True,
+        validators=[RegexValidator(r'^1[3-9]\d{9}$', '手机号格式错误'), ],
+    )
+    code = forms.CharField(
+        label="验证码",
+        widget=forms.TextInput(),
+        required=True,
+    )
+
+    def clean_password(self):
+        pwd = self.cleaned_data.get("password")
+        return md5(pwd)
+        # 钩子函数
+
+    def clean_confirm_password(self):
+        pwd = self.cleaned_data.get("password")
+        confirm = self.cleaned_data.get("confirm_password")
+        if md5(confirm) != pwd:
+            raise ValidationError("密码不一致!")
+        # return返回什么,字段 confirm_password 保存至数据库的值就是什么
+        return md5(confirm)
+
+
+class SendSmsForm(forms.Form):
+    mobile_phone = forms.CharField(
+        label="手机号",
+        widget=forms.TextInput(),
+        required=True,
+        validators=[RegexValidator(r'^1[3-9]\d{9}$', '手机号格式错误'), ],
+    )
+
+    def clean_mobile_phone(self):
+        # 检查手机号是否已被注册
+        mobile_phone = self.cleaned_data.get('mobile_phone')
+        print(mobile_phone)
+        exists = Admin.objects.filter(phone=mobile_phone).exists()
+        if exists:
+            raise ValidationError('改手机号已被注册')
+        # 发送短信
+        code = random.randrange(1000, 9999)
+        # 存入redis
+        return mobile_phone
+
+
+class OrderModelForm(BootStrapModelForm):
+    price = forms.IntegerField(
+        min_value=0,
+        label="价格",
+    )
+
+    class Meta:
+        model = Order
+        fields = ["title", "price", "status"]
+        # exclude = ["oid", "admin"]
+
+
+class ExcelForm(forms.Form):
+    pass

@@ -20,12 +20,13 @@ from app01 import views
 
 urlpatterns = [
     # path('admin/', admin.site.urls),
-    path('index/', views.index),
+    path('', views.index),
     # 部门管理
     path('department/list/', views.department_list),
     path('department/add/', views.department_add),
     path('department/delete/', views.department_delete),
     path('department/<int:nid>/edit/', views.department_edit),
+    path('department/multi/', views.department_multi),
     # 用户管理
     path('user/list/', views.user_list),
     path('user/add/', views.user_add),
@@ -42,7 +43,18 @@ urlpatterns = [
     path('admin/<int:nid>/delete/', views.admin_delete),
     path('admin/<int:nid>/edit/', views.admin_edit),
     path('admin/<int:nid>/reset/', views.admin_reset),
+    path('image/code/', views.image_code),
+    # 订单管理
+    path('order/list/', views.order_list),
+    path('order/ajax/', views.order_ajax),
+    path('order/add/', views.order_add),
+    path('order/delete/', views.order_delete),
+    path('order/edit/', views.order_edit),
+    path('order/detail/', views.order_detail),
+    #     发送短信
+    #     用户登录和注册
     path('login/', views.login),
     path('logout/', views.logout),
-    path('image/code/', views.image_code),
+    path('register/', views.register),
+    path('send_sms/', views.send_sms),
 ]

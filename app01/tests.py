@@ -7,3 +7,4 @@ def func(*args):
 
 
 func(1, 2, 3, 4)
+
