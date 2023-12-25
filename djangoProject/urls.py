@@ -57,4 +57,5 @@ urlpatterns = [
     path('logout/', views.logout),
     path('register/', views.register),
     path('send_sms/', views.send_sms),
+    path('smslogin/', views.sms_login),
 ]

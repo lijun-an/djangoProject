@@ -5,18 +5,23 @@ from django.shortcuts import render, HttpResponse, redirect
 from app01.models import User, Department, Pretty, Admin, Order
 from app01.utils.pagiation import Pagination
 from app01.form.form import PrettyModelForm, PrettyEditModelForm, UserModelForm, AdminModelForm, AdminEditModelForm, \
-    AdminResetModelForm, LoginForm, OrderModelForm, ExcelForm, RegisterFrom, SendSmsForm
+    AdminResetModelForm, LoginForm, OrderModelForm, ExcelForm, RegisterForm, SendSmsForm, SmsLoginForm
 from django.views.decorators.csrf import csrf_exempt
 from app01.utils.code import check_code
 from django.shortcuts import HttpResponse
 from io import BytesIO
 import json
 from openpyxl import load_workbook
+from django_redis import get_redis_connection
 
 
 # Create your views here.
 def index(request):
-    return redirect('/')
+    conn = get_redis_connection('default')  # default是连接池的名称
+    conn.set("name", "冰冷的希望")
+    name = conn.get('name').decode('utf-8')
+    print(name)
+    return HttpResponse('连接成功')
 
 
 # #################################   部门管理  # #################################
@@ -309,6 +314,21 @@ def login(request):
     return render(request, 'login.html', {"form": form})
 
 
+def sms_login(request):
+    if request.method == "GET":
+        form = SmsLoginForm()
+        return render(request, "smslogin.html", {"form": form})
+    form = SmsLoginForm(data=request.POST)
+    if form.is_valid():
+        mobile_phone = form.cleaned_data['phone']
+        admin_object = Admin.objects.filter(phone=mobile_phone).first()
+        print('登录成功')
+        # 存在则登录成功，网站生成随机字符串，写到用户浏览器的cookie中，与服务器中的session进行校验
+        request.session['info'] = {"id": admin_object.pk, "name": admin_object.name}
+        return HttpResponse(json.dumps({"status": True, "data": '/admin/list/'}))
+    return HttpResponse(json.dumps({"status": False, "error": form.errors}))
+
+
 def logout(request):
     """ 注销 """
     # 清楚当前session
@@ -319,22 +339,22 @@ def logout(request):
 def register(request):
     """用户注册"""
     if request.method == "GET":
-        form = RegisterFrom()
-        print(form.errors)
+        form = RegisterForm()
         return render(request, "register.html", {"form": form})
-    form = RegisterFrom(data=request.POST)
+    form = RegisterForm(data=request.POST)
+    print(request.POST)
     if form.is_valid():
-        # 验证码的校验
-        pass
-        return redirect("/admin/list")
-    return render(request, 'register.html', {"form": form})
+        # 存入数据库
+        data_dic = form.cleaned_data
+        data_dic.pop('code')
+        data_dic.pop('confirm_password')
+        Admin.objects.create(**data_dic)
+        return HttpResponse(json.dumps({"status": True, "data": '/login/'}))
+    return HttpResponse(json.dumps({"status": False, "error": form.errors}))
 
 
 def send_sms(request):
-    mobile_phone = request.GET.get('mobile_phone')
-    tpl = request.GET.get('tpl')
-    print(request.GET)
-    form = SendSmsForm(request.GET)
+    form = SendSmsForm(request, request.GET)
     if form.is_valid():
         return HttpResponse(json.dumps({"status": True}))
     print(form.errors)

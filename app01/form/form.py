@@ -4,8 +4,10 @@ from app01.models import User, Pretty, Admin, Order
 from django import forms
 from django.core.exceptions import ValidationError
 from app01.utils.modelform import BootStrapModelForm, BootStrapForm
+from app01.utils.sms import send_sms
 from django.core.validators import RegexValidator
 from app01.utils.encrypt import md5
+from django_redis import get_redis_connection
 
 
 # 使用ModelForm进行验证
@@ -188,7 +190,7 @@ class LoginForm(forms.Form):
         return md5(pwd)
 
 
-class RegisterFrom(BootStrapForm):
+class RegisterForm(BootStrapForm):
     name = forms.CharField(
         label="用户名",
         widget=forms.TextInput(),
@@ -212,7 +214,7 @@ class RegisterFrom(BootStrapForm):
         widget=forms.PasswordInput(),
         required=True,
     )
-    mobile_phone = forms.CharField(
+    phone = forms.CharField(
         label="手机号",
         widget=forms.TextInput(),
         required=True,
@@ -224,6 +226,27 @@ class RegisterFrom(BootStrapForm):
         required=True,
     )
 
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        exists = Admin.objects.filter(name=name).exists()
+        if exists:
+            raise ValidationError('改用户名已被注册使用')
+        return name
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        exists = Admin.objects.filter(email=email).exists()
+        if exists:
+            raise ValidationError('改邮箱已被注册使用')
+        return email
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        exists = Admin.objects.filter(phone=phone).exists()
+        if exists:
+            raise ValidationError('改电话已被注册使用')
+        return phone
+
     def clean_password(self):
         pwd = self.cleaned_data.get("password")
         return md5(pwd)
@@ -233,30 +256,99 @@ class RegisterFrom(BootStrapForm):
         pwd = self.cleaned_data.get("password")
         confirm = self.cleaned_data.get("confirm_password")
         if md5(confirm) != pwd:
-            raise ValidationError("密码不一致!")
+            raise ValidationError("密码不一致")
         # return返回什么,字段 confirm_password 保存至数据库的值就是什么
         return md5(confirm)
 
+    def clean_code(self):
+        input_code = self.cleaned_data.get("code")
+        mobile_phone = self.cleaned_data.get('phone')
+        # 从redis中获取改手机号对应的验证码
+        if not mobile_phone:
+            return input_code
+        conn = get_redis_connection('default')  # default是连接池的名称
+        code = conn.get(mobile_phone)
+        code_text = code.decode('utf-8') if code else ''
+        print(code_text, input_code)
+        if code_text != input_code:
+            raise ValidationError('验证码错误')
+
 
 class SendSmsForm(forms.Form):
-    mobile_phone = forms.CharField(
+    phone = forms.CharField(
         label="手机号",
         widget=forms.TextInput(),
         required=True,
         validators=[RegexValidator(r'^1[3-9]\d{9}$', '手机号格式错误'), ],
     )
+    tpl = forms.CharField(
+        label="短信业务类型",
+        widget=forms.TextInput(),
+        required=True,
+    )
 
-    def clean_mobile_phone(self):
-        # 检查手机号是否已被注册
-        mobile_phone = self.cleaned_data.get('mobile_phone')
-        print(mobile_phone)
+    def clean_phone(self):
+        # 判断业务是登录还是注册
+        tpl = self.request.GET.get('tpl')
+        mobile_phone = self.cleaned_data.get("phone")
         exists = Admin.objects.filter(phone=mobile_phone).exists()
-        if exists:
-            raise ValidationError('改手机号已被注册')
+        if tpl == 'login':
+            # 检查手机号是否注册过
+            if not exists:
+                raise ValidationError('改手机号未被注册')
+        else:
+            if exists:
+                raise ValidationError('改手机号已被注册')
         # 发送短信
         code = random.randrange(1000, 9999)
+        # 阿里云发送短信代码
+        send_res = send_sms(mobile_phone, code)
+        print(send_res)
+        if send_res['Message'] != 'OK':
+            self.errors.add_error("code", send_res['Message'])
+        print('手机号为: ', mobile_phone, '验证码为: ', code)
         # 存入redis
+        conn = get_redis_connection('default')  # default是连接池的名称
+        conn.set(mobile_phone, code, 60)
         return mobile_phone
+
+    def __init__(self, request, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.request = request
+
+
+class SmsLoginForm(BootStrapForm):
+    phone = forms.CharField(
+        label="手机号",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+        required=True,
+    )
+
+    code = forms.CharField(
+        label="验证码",
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+        required=True,
+    )
+
+    def clean_phone(self):
+        mobile_phone = self.cleaned_data.get('phone')
+        exists = Admin.objects.filter(phone=mobile_phone).exists()
+        if not exists:
+            raise ValidationError('手机号不存在')
+        return mobile_phone
+
+    def clean_code(self):
+        mobile_phone = self.cleaned_data.get('phone')
+        input_code = self.cleaned_data.get('code')
+        if not mobile_phone:
+            return input_code
+        conn = get_redis_connection('default')  # default是连接池的名称
+        code = conn.get(mobile_phone)
+        code_text = code.decode('utf-8') if code else ''
+        print(code_text, input_code)
+        if code_text != input_code:
+            raise ValidationError('验证码错误')
+        return input_code
 
 
 class OrderModelForm(BootStrapModelForm):
