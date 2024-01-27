@@ -17,11 +17,11 @@ from django_redis import get_redis_connection
 
 # Create your views here.
 def index(request):
-    conn = get_redis_connection('default')  # default是连接池的名称
-    conn.set("name", "冰冷的希望")
-    name = conn.get('name').decode('utf-8')
-    print(name)
-    return HttpResponse('连接成功')
+    # conn = get_redis_connection('default')  # default是连接池的名称
+    # conn.set("name", "冰冷的希望")
+    # name = conn.get('name').decode('utf-8')
+    # print(name)
+    return HttpResponse('首页')
 
 
 # #################################   部门管理  # #################################
